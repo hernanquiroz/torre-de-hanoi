@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Torre de Hanoi</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: #e8e8e8;
+    font-family: 'Segoe UI', sans-serif;
+  }
+
+  h1 {
+    margin-bottom: 10px;
+    color: #333;
+  }
+
+  .info {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 20px;
+    font-size: 1.1em;
+    color: #444;
+  }
+
+  .info span { font-weight: bold; color: #222; }
+
+  .game-container {
+    position: relative;
+    width: 700px;
+    height: 320px;
+    background: #c8b89a;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    padding: 0 40px 0 40px;
+    border-bottom: 18px solid #a89878;
+  }
+
+  .peg-area {
+    position: relative;
+    width: 180px;
+    height: 280px;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 8px;
+  }
+
+  .peg-area:hover {
+    background: rgba(255,255,255,0.15);
+  }
+
+  .peg-area.selected {
+    background: rgba(255,200,50,0.25);
+    box-shadow: 0 0 12px rgba(255,200,50,0.5);
+  }
+
+  .peg {
+    position: absolute;
+    bottom: 0;
+    width: 16px;
+    height: 200px;
+    background: linear-gradient(90deg, #3a2a1a, #5c3d2e, #3a2a1a);
+    border-radius: 4px 4px 0 0;
+    z-index: 1;
+  }
+
+  .disc {
+    height: 32px;
+    border-radius: 6px;
+    z-index: 2;
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.3);
+    position: relative;
+  }
+
+  .disc:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.3);
+  }
+
+  .disc.selected-disc {
+    transform: translateY(-30px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.3);
+  }
+
+  /* Colores de los discos de la imagen (de mayor a menor) */
+  .disc-1 { background: linear-gradient(180deg, #e8d44d, #c9b030); width: 220px; }
+  .disc-2 { background: linear-gradient(180deg, #2196F3, #1565C0); width: 180px; }
+  .disc-3 { background: linear-gradient(180deg, #e53935, #b71c1c); width: 150px; }
+  .disc-4 { background: linear-gradient(180deg, #43A047, #1B5E20); width: 120px; }
+  .disc-5 { background: linear-gradient(180deg, #f0d040, #c9a820); width: 90px; }
+
+  .controls {
+    margin-top: 20px;
+    display: flex;
+    gap: 15px;
+  }
+
+  button {
+    padding: 10px 24px;
+    font-size: 1em;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #5c3d2e;
+    color: white;
+    transition: background 0.2s;
+  }
+
+  button:hover { background: #7a5240; }
+
+  .message {
+    margin-top: 15px;
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #2e7d32;
+    min-height: 30px;
+  }
+
+  .peg-label {
+    position: absolute;
+    bottom: -30px;
+    font-size: 0.9em;
+    color: #666;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>🗼 Torre de Hanoi</h1>
+
+<div class="info">
+  <div>Movimientos: <span id="moves">0</span></div>
+  <div>Mínimo: <span>31</span></div>
+</div>
+
+<div class="game-container" id="game">
+  <div class="peg-area" id="peg-0" onclick="handleClick(0)">
+    <div class="peg"></div>
+    <div class="peg-label">Poste 1</div>
+  </div>
+  <div class="peg-area" id="peg-1" onclick="handleClick(1)">
+    <div class="peg"></div>
+    <div class="peg-label">Poste 2</div>
+  </div>
+  <div class="peg-area" id="peg-2" onclick="handleClick(2)">
+    <div class="peg"></div>
+    <div class="peg-label">Poste 3</div>
+  </div>
+</div>
+
+<div class="controls">
+  <button onclick="resetGame()"> Reiniciar</button>
+</div>
+
+<div class="message" id="message"></div>
+
+<script>
+  // Estado del juego: 3 postes, discos representados por su tamaño (1=pequeño, 5=grande)
+  // Colores de la imagen: amarillo grande, azul, rojo, verde, amarillo pequeño
+  let pegs = [[], [], []];
+  let selectedPeg = null;
+  let moves = 0;
+  let won = false;
+
+  function init() {
+    // Todos los discos en el poste 2 (índice 2, el de la derecha como en la imagen)
+    // Orden: de abajo (grande) a arriba (pequeño)
+    pegs = [[], [], [5, 4, 3, 2, 1]];
+    selectedPeg = null;
+    moves = 0;
+    won = false;
+    document.getElementById('message').textContent = '';
+    render();
+  }
+
+  function render() {
+    document.getElementById('moves').textContent = moves;
+
+    for (let i = 0; i < 3; i++) {
+      const pegArea = document.getElementById(`peg-${i}`);
+      // Limpiar discos anteriores (mantener el peg y label)
+      const discs = pegArea.querySelectorAll('.disc');
+      discs.forEach(d => d.remove());
+      pegArea.classList.remove('selected');
+
+      // Renderizar discos de abajo hacia arriba
+      pegs[i].forEach((size, idx) => {
+        const disc = document.createElement('div');
+        disc.className = `disc disc-${size}`;
+        // Si es el disco superior y el poste está seleccionado, destacarlo
+        if (idx === pegs[i].length - 1 && selectedPeg === i) {
+          disc.classList.add('selected-disc');
+        }
+        pegArea.appendChild(disc);
+      });
+    }
+
+    if (selectedPeg !== null) {
+      document.getElementById(`peg-${selectedPeg}`).classList.add('selected');
+    }
+  }
+
+  function handleClick(pegIndex) {
+    if (won) return;
+
+    if (selectedPeg === null) {
+      // Seleccionar poste origen
+      if (pegs[pegIndex].length === 0) return; // no hay discos
+      selectedPeg = pegIndex;
+    } else if (selectedPeg === pegIndex) {
+      // Deseleccionar
+      selectedPeg = null;
+    } else {
+      // Intentar mover
+      const source = pegs[selectedPeg];
+      const target = pegs[pegIndex];
+      const topDisc = source[source.length - 1];
+
+      if (target.length === 0 || topDisc < target[target.length - 1]) {
+        // Movimiento válido
+        source.pop();
+        target.push(topDisc);
+        moves++;
+        selectedPeg = null;
+
+        // Verificar victoria
+        if (pegs[2].length === 5) {
+          won = true;
+          document.getElementById('message').textContent = `🎉 ¡Ganaste en ${moves} movimientos!`;
+        }
+      } else {
+        // Movimiento inválido
+        document.getElementById('message').textContent = ' No puedes poner un disco grande sobre uno pequeño';
+        setTimeout(() => {
+          if (!won) document.getElementById('message').textContent = '';
+        }, 1500);
+        selectedPeg = null;
+      }
+    }
+
+    render();
+  }
+
+  function resetGame() {
+    init();
+  }
+
+  // Iniciar
+  init();
+</script>
+
+</body>
+</html>
