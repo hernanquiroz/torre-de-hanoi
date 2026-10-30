@@ -1,1 +1,602 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Simulador interactivo de la Torre de Hanói de madera con tres varillas y discos de colores. Diseño Vibe Coding por Ing. Hernán Quiroz.">
+<title>Torre de Hanói</title>
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;600&display=swap">
+<style>
+/* Layout: the tower board fills the screen on its own; message, difficulty and controls sit in one band below it. */
+:root{
+  --bg:#E8EDF0;
+  --surface:#F7F9FA;
+  --fg:#1E2A31;
+  --muted:#5B6B75;
+  --line:#C5D0D6;
+  --accent:#1F7DA8;
+  --accent-fg:#FFFFFF;
+  --bad:#B3342B;
+  --shadow:rgba(20,35,45,.30);
+  --display:"Bricolage Grotesque",ui-rounded,system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12181C;--surface:#1B2429;--fg:#E6EDF1;--muted:#9AAAB4;--line:#2E3B43;
+    --accent:#4DB6E6;--accent-fg:#06222F;--bad:#FF7D72;--shadow:rgba(0,0,0,.65);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12181C;--surface:#1B2429;--fg:#E6EDF1;--muted:#9AAAB4;--line:#2E3B43;
+  --accent:#4DB6E6;--accent-fg:#06222F;--bad:#FF7D72;--shadow:rgba(0,0,0,.65);
+  color-scheme:dark;
+}
+
+html{font-size:clamp(15px,.55vw + 11px,28px)}
+html,body{height:100%}
+body{
+  margin:0;box-sizing:border-box;
+  background:var(--bg);color:var(--fg);
+  font:400 1rem/1.4 var(--body);
+  padding-block:.75rem;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-tap-highlight-color:transparent;
+}
+.app{height:100%;display:flex;flex-direction:column;gap:.5rem;max-width:140rem;margin-inline:auto}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+h1{margin:0;font:700 1.5rem/1.1 var(--display);letter-spacing:-.01em;text-wrap:balance}
+.stats{margin:0;display:flex;gap:1.25rem;color:var(--muted);font-size:.9rem}
+.stats b{font:700 1.6rem/1 var(--display);color:var(--fg);font-variant-numeric:tabular-nums;margin-left:.35rem}
+
+.stage{flex:1 1 auto;min-height:9rem;min-width:0;overflow:hidden;display:flex}
+#hanoi{flex:1 1 auto;min-width:0;align-self:stretch;display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.ground{fill:var(--shadow)}
+.plab{font:700 44px var(--display);fill:var(--muted);text-anchor:middle;pointer-events:none}
+.hit{fill:var(--accent);fill-opacity:0;cursor:pointer;transition:fill-opacity .12s;outline:none}
+@media (hover:hover){.hit:hover{fill-opacity:.06}}
+.hit.sel,.hit.target{fill-opacity:.14}
+.hit.bad{fill:var(--bad);fill-opacity:.22}
+.hit:focus-visible{stroke:var(--accent);stroke-width:6}
+#hanoi.dragging .hit{cursor:grabbing}
+
+.panel{display:flex;flex-direction:column;gap:.65rem}
+.msg{margin:0;min-height:1.4em;text-align:center;font-weight:600;text-wrap:balance}
+.msg.ok{color:var(--accent)}
+.msg.bad{color:var(--bad)}
+.cap{margin:0;font-size:.8rem;color:var(--muted);letter-spacing:.02em}
+.rowc{display:flex;align-items:center;justify-content:center;gap:.6rem;flex-wrap:wrap}
+.seg{display:flex;gap:.4rem}
+.actions{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}
+.btn{appearance:none;font:600 .95rem/1 var(--body);min-height:2.9rem;padding:.6rem 1rem;border-radius:.6rem;
+  background:var(--surface);color:var(--fg);border:1px solid var(--line);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+.btn.num{min-width:2.9rem;padding-inline:.5rem}
+.btn[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--accent)}
+.btn[disabled]{opacity:.45;cursor:default}
+.btn[disabled]:hover{border-color:var(--line)}
+.btn[hidden]{display:none}
+.credit{margin:0;text-align:center;font-size:.8rem;color:var(--muted);letter-spacing:.02em}
+.credit b{color:var(--fg);font-weight:600}
+
+@media (max-width:30rem){
+  .actions .btn{flex:1 1 calc(50% - .25rem)}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="top">
+    <h1>Torre de Hanói</h1>
+    <p class="stats">
+      <span>Movimientos <b id="moves">0</b></span>
+      <span>Mínimo <b id="min">31</b></span>
+    </p>
+  </header>
+
+  <main class="stage">
+    <svg id="hanoi" viewBox="90 410 1750 656" preserveAspectRatio="xMidYMid meet" role="group"
+         aria-label="Torre de Hanói de madera con tres varillas y cinco discos de colores">
+      <defs>
+        <filter id="blur" x="-10%" y="-400%" width="120%" height="900%"><feGaussianBlur stdDeviation="12"/></filter>
+
+        <filter id="mdf" x="0" y="0" width="1" height="1">
+          <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="11" result="n"/>
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 .42  0 0 0 0 .27  0 0 0 0 .12  2.4 0 0 0 -1.1" result="s"/>
+          <feComposite in="s" in2="SourceAlpha" operator="in" result="si"/>
+          <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="si"/></feMerge>
+        </filter>
+        <filter id="grainPeg" x="0" y="0" width="1" height="1">
+          <feTurbulence type="fractalNoise" baseFrequency="0.25 0.006" numOctaves="2" seed="4" result="n"/>
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 .62  0 0 0 0 .42  0 0 0 0 .30  1.9 0 0 0 -.78" result="g"/>
+          <feComposite in="g" in2="SourceAlpha" operator="in" result="gi"/>
+          <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="gi"/></feMerge>
+        </filter>
+
+        <linearGradient id="boardTop" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#DDB880"/><stop offset="1" stop-color="#D2A96B"/>
+        </linearGradient>
+        <linearGradient id="boardFront" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#CFA766"/><stop offset="1" stop-color="#B88B4B"/>
+        </linearGradient>
+        <linearGradient id="pegG" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#47291F"/>
+          <stop offset=".3" stop-color="#6A4333"/>
+          <stop offset=".62" stop-color="#4C2D22"/>
+          <stop offset="1" stop-color="#2E1812"/>
+        </linearGradient>
+
+        <linearGradient id="ds-Y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0C41C"/><stop offset="1" stop-color="#C99B08"/></linearGradient>
+        <linearGradient id="dt-Y" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F9DB4C"/><stop offset="1" stop-color="#F0C41C"/></linearGradient>
+        <linearGradient id="ds-G" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1AA25C"/><stop offset="1" stop-color="#0E7A42"/></linearGradient>
+        <linearGradient id="dt-G" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43C685"/><stop offset="1" stop-color="#22A862"/></linearGradient>
+        <linearGradient id="ds-R" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E32A30"/><stop offset="1" stop-color="#B3161D"/></linearGradient>
+        <linearGradient id="dt-R" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F65A5F"/><stop offset="1" stop-color="#E1343A"/></linearGradient>
+        <linearGradient id="ds-B" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D78D6"/><stop offset="1" stop-color="#1257A8"/></linearGradient>
+        <linearGradient id="dt-B" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#56A4EE"/><stop offset="1" stop-color="#2D86E0"/></linearGradient>
+        <linearGradient id="rim" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#000" stop-opacity=".30"/>
+          <stop offset=".16" stop-color="#000" stop-opacity="0"/>
+          <stop offset=".84" stop-color="#000" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity=".34"/>
+        </linearGradient>
+      </defs>
+
+      <!-- sombra de apoyo -->
+      <ellipse class="ground" cx="962" cy="1012" rx="850" ry="16" filter="url(#blur)"/>
+
+      <!-- base de MDF -->
+      <path d="M133,952 H1792 V985 Q1792,1003 1774,1003 H151 Q133,1003 133,985 Z" fill="url(#boardFront)" filter="url(#mdf)"/>
+      <path d="M183,866 H1742 Q1760,866 1766,880 L1790,936 Q1795,953 1776,953 H149 Q130,953 135,936 L159,880 Q165,866 183,866 Z" fill="url(#boardTop)" filter="url(#mdf)"/>
+      <path d="M133,953 H1792" stroke="#F3DDAE" stroke-opacity=".55" stroke-width="2" fill="none"/>
+      <path d="M133,1000 H1792" stroke="#6E4A22" stroke-opacity=".25" stroke-width="2" fill="none"/>
+
+      <g id="pegsG"></g>
+      <g id="disksG"></g>
+      <g id="labelsG"></g>
+      <g id="hitsG"></g>
+    </svg>
+  </main>
+
+  <footer class="panel">
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+    <div class="rowc">
+      <p class="cap">Discos</p>
+      <div class="seg" role="group" aria-label="Número de discos">
+        <button class="btn num" type="button" data-n="3" aria-pressed="false">3</button>
+        <button class="btn num" type="button" data-n="4" aria-pressed="false">4</button>
+        <button class="btn num" type="button" data-n="5" aria-pressed="true">5</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="bUndo" type="button">Deshacer</button>
+      <button class="btn primary" id="bReset" type="button">Reiniciar</button>
+      <button class="btn" id="bSolve" type="button">Ver solución</button>
+      <button class="btn" id="bSound" type="button" aria-pressed="true">Sonido: sí</button>
+      <button class="btn" id="bFull" type="button" hidden>Pantalla completa</button>
+    </div>
+    <p class="credit">Diseño Vibe Coding por <b>Ing. Hernán Quiroz</b></p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var T = 47, BASE_Y = 882, PEG_X = [492, 962, 1432], PEG_TOP = 585, PEG_R = 28, LIFT_Y = 520;
+  /* tamaños tomados de la foto: de menor a mayor */
+  var SPEC = [
+    { w: 215, c: 'Y' }, { w: 264, c: 'G' }, { w: 319, c: 'R' }, { w: 370, c: 'B' }, { w: 426, c: 'Y' }
+  ];
+  var ILLEGAL = 'Un disco grande no puede ir sobre uno más pequeño.';
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function $(id) { return document.getElementById(id); }
+  var svg = $('hanoi'), pegsG = $('pegsG'), disksG = $('disksG'), labelsG = $('labelsG'), hitsG = $('hitsG');
+  var msgEl = $('msg'), movesEl = $('moves'), minEl = $('min');
+  var bUndo = $('bUndo'), bReset = $('bReset'), bSolve = $('bSolve'), bSound = $('bSound'), bFull = $('bFull');
+  var segBtns = Array.prototype.slice.call(document.querySelectorAll('.seg .btn'));
+
+  /* ---------- estado ---------- */
+  var n = 5, pegs = [[], [], []], disks = [], history = [], moves = 0;
+  var sel = null, won = false, locked = false, solving = false, stopFlag = false, gid = 0, drag = null;
+
+  /* ---------- dibujo fijo: varillas, etiquetas y zonas táctiles ---------- */
+  function mk(name, attrs) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  var hits = [];
+  var bounds = [-4000, 727, 1197, 5000];
+  PEG_X.forEach(function (x, i) {
+    var g = mk('g', {});
+    g.innerHTML =
+      '<ellipse cx="' + x + '" cy="' + (BASE_Y + 3) + '" rx="35" ry="7" fill="#9C7442" opacity=".8"/>' +
+      '<path d="M' + (x - PEG_R) + ' ' + PEG_TOP + 'V' + BASE_Y + 'A' + PEG_R + ' 5.4 0 0 0 ' + (x + PEG_R) + ' ' + BASE_Y +
+        'V' + PEG_TOP + 'Z" fill="url(#pegG)" filter="url(#grainPeg)"/>' +
+      '<ellipse cx="' + x + '" cy="' + PEG_TOP + '" rx="' + PEG_R + '" ry="5.4" fill="#7B5241"/>' +
+      '<ellipse cx="' + x + '" cy="' + PEG_TOP + '" rx="' + (PEG_R - 7) + '" ry="2.4" fill="#5A3828"/>';
+    pegsG.appendChild(g);
+
+    var t = mk('text', { x: x, y: 1050, 'class': 'plab' });
+    t.textContent = String(i + 1);
+    labelsG.appendChild(t);
+
+    var h = mk('rect', {
+      x: bounds[i], y: -3000, width: bounds[i + 1] - bounds[i], height: 8000,
+      'class': 'hit', 'data-p': i, tabindex: '0', role: 'button'
+    });
+    hitsG.appendChild(h);
+    hits.push(h);
+    h.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTap(i); }
+    });
+  });
+
+  /* ---------- discos ---------- */
+  function mkDisk(s) {
+    var spec = SPEC[s - 1], rx = spec.w / 2, ry = rx * 0.1, c = spec.c;
+    var body = 'M' + (-rx) + ' ' + (-T) + 'V0A' + rx + ' ' + ry.toFixed(2) + ' 0 0 0 ' + rx + ' 0V' + (-T) + 'Z';
+    var g = mk('g', { 'class': 'disk' });
+    g.innerHTML =
+      '<path d="' + body + '" fill="url(#ds-' + c + ')"/>' +
+      '<path d="' + body + '" fill="url(#rim)"/>' +
+      '<ellipse cy="' + (-T) + '" rx="' + rx + '" ry="' + ry.toFixed(2) + '" fill="url(#dt-' + c + ')"/>' +
+      '<ellipse cy="' + (-T) + '" rx="' + (rx - 1) + '" ry="' + (ry - 1).toFixed(2) + '" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="2"/>' +
+      '<ellipse cy="' + (-T) + '" rx="34" ry="6.6" fill="#000" fill-opacity=".32"/>' +
+      '<ellipse cy="' + (-T) + '" rx="30" ry="5.8" fill="#2E1A14"/>';
+    return { s: s, el: g, x: 0, y: 0, peg: 2, tok: null };
+  }
+  function setPos(d, x, y) {
+    d.x = x; d.y = y;
+    d.el.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+  }
+  function restY(p) { return BASE_Y - (pegs[p].length - 1) * T; }
+  function top(p) { return pegs[p][pegs[p].length - 1]; }
+  function front(d) { disksG.appendChild(d.el); }
+  function legal(a, b) {
+    if (!pegs[a].length) return false;
+    var t = top(b);
+    return !t || t.s > top(a).s;
+  }
+  function nearest(x) {
+    var best = 0, bd = Infinity;
+    PEG_X.forEach(function (px, i) { var dd = Math.abs(px - x); if (dd < bd) { bd = dd; best = i; } });
+    return best;
+  }
+
+  /* ---------- animación ---------- */
+  function tween(d, tx, ty, dur) {
+    return new Promise(function (res) {
+      var tok = {};
+      d.tok = tok;
+      if (reduce || dur <= 0) { setPos(d, tx, ty); res(); return; }
+      var x0 = d.x, y0 = d.y, t0 = performance.now();
+      (function f(t) {
+        if (d.tok !== tok) { res(); return; }
+        var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        setPos(d, x0 + (tx - x0) * e, y0 + (ty - y0) * e);
+        if (k < 1) requestAnimationFrame(f); else res();
+      })(t0);
+    });
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, reduce ? 0 : ms); }); }
+  async function shake(d) {
+    var x = d.x;
+    await tween(d, x - 14, d.y, 60);
+    await tween(d, x + 14, d.y, 60);
+    await tween(d, x, d.y, 60);
+  }
+
+  /* ---------- sonido ---------- */
+  var ac = null, soundOn = true, lastClick = 0, noiseBuf = null;
+  function ensureAudio() {
+    try {
+      if (!ac) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) ac = new AC(); }
+      if (ac && ac.state === 'suspended') ac.resume();
+    } catch (e) { ac = null; }
+  }
+  function tock() {
+    if (!soundOn || !ac) return;
+    var now = ac.currentTime;
+    if (now - lastClick < 0.03) return;
+    lastClick = now;
+    try {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(300 + Math.random() * 80, now);
+      o.frequency.exponentialRampToValueAtTime(130, now + 0.08);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.2, now + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+      o.connect(g); g.connect(ac.destination);
+      o.start(now); o.stop(now + 0.13);
+      if (!noiseBuf) {
+        var len = Math.floor(ac.sampleRate * 0.03);
+        noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+        var dd = noiseBuf.getChannelData(0);
+        for (var i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+      }
+      var ns = ac.createBufferSource(); ns.buffer = noiseBuf;
+      var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500;
+      var ng = ac.createGain(); ng.gain.value = 0.18;
+      ns.connect(bp); bp.connect(ng); ng.connect(ac.destination);
+      ns.start(now);
+    } catch (e) { /* sin sonido */ }
+  }
+  function thunk() {
+    if (!soundOn || !ac) return;
+    var now = ac.currentTime;
+    try {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(150, now);
+      o.frequency.exponentialRampToValueAtTime(70, now + 0.14);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      o.connect(g); g.connect(ac.destination);
+      o.start(now); o.stop(now + 0.2);
+    } catch (e) { /* sin sonido */ }
+  }
+  function chime() {
+    if (!soundOn || !ac) return;
+    var now = ac.currentTime;
+    [523.25, 659.25, 783.99, 1046.5].forEach(function (f, i) {
+      try {
+        var o = ac.createOscillator(), g = ac.createGain(), t = now + i * 0.11;
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.14, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + 0.5);
+      } catch (e) { /* sin sonido */ }
+    });
+  }
+
+  /* ---------- interfaz ---------- */
+  function say(text, cls) { msgEl.textContent = text; msgEl.className = 'msg' + (cls ? ' ' + cls : ''); }
+  function intro() { return 'Pasa los ' + n + ' discos a otra varilla. Arrastra un disco o toca una varilla para levantarlo.'; }
+  function mark(p, cls, on) { hits[p].classList.toggle(cls, on); }
+  function flashBad(p) { mark(p, 'bad', true); setTimeout(function () { mark(p, 'bad', false); }, 420); }
+  function clearTargets() { hits.forEach(function (h) { h.classList.remove('target'); }); }
+  function updateUI() {
+    movesEl.textContent = moves;
+    minEl.textContent = (Math.pow(2, n) - 1);
+    hits.forEach(function (h, p) {
+      var c = pegs[p].length;
+      h.setAttribute('aria-label', 'Varilla ' + (p + 1) + ', ' + c + (c === 1 ? ' disco' : ' discos'));
+    });
+    bUndo.disabled = !history.length || solving;
+  }
+  function setSolveUI(on) {
+    bSolve.textContent = on ? 'Detener' : 'Ver solución';
+    bReset.disabled = on;
+    segBtns.forEach(function (b) { b.disabled = on; });
+    bUndo.disabled = on || !history.length;
+  }
+
+  function newGame() {
+    gid++;
+    disks.forEach(function (d) { d.tok = {}; });
+    disksG.textContent = '';
+    pegs = [[], [], []]; disks = []; history = []; moves = 0;
+    won = false; sel = null; locked = false;
+    hits.forEach(function (h) { h.classList.remove('sel', 'target', 'bad'); });
+    for (var s = n; s >= 1; s--) {
+      var d = mkDisk(s);
+      disks.push(d); pegs[2].push(d); d.peg = 2;
+      disksG.appendChild(d.el);
+      setPos(d, PEG_X[2], restY(2));
+    }
+    say(intro());
+    updateUI();
+  }
+
+  /* ---------- jugadas ---------- */
+  function checkWin() {
+    if (pegs[0].length === n || pegs[1].length === n) {
+      won = true;
+      var min = Math.pow(2, n) - 1;
+      say('¡Lo lograste en ' + moves + ' movimientos! ' + (moves === min ? 'Es el mínimo posible.' : 'El mínimo posible es ' + min + '.'), 'ok');
+      chime();
+    }
+  }
+  async function commit(a, b, o) {
+    o = o || {};
+    var g = gid;
+    var d = pegs[a].pop();
+    pegs[b].push(d); d.peg = b;
+    if (o.rec !== false) history.push([a, b]);
+    moves += o.undo ? -1 : 1;
+    updateUI();
+    locked = true;
+    front(d);
+    var f = o.speed || 1, tx = PEG_X[b], ty = restY(b);
+    if (o.direct) {
+      await tween(d, tx, ty, 230 * f);
+    } else {
+      if (d.y > LIFT_Y + 3) await tween(d, d.x, LIFT_Y, 170 * f);
+      if (g !== gid) return;
+      await tween(d, tx, LIFT_Y, Math.min(480, 170 + Math.abs(tx - d.x) * 0.33) * f);
+      if (g !== gid) return;
+      await tween(d, tx, ty, 200 * f);
+    }
+    if (g !== gid) return;
+    tock();
+    locked = false;
+    checkWin();
+  }
+  function select(p) {
+    var d = top(p);
+    sel = p; front(d); mark(p, 'sel', true);
+    say('Disco levantado. Toca la varilla donde quieres dejarlo.');
+    return tween(d, PEG_X[p], LIFT_Y, 170);
+  }
+  function deselect() {
+    if (sel === null) return Promise.resolve();
+    var p = sel, d = top(p);
+    sel = null; mark(p, 'sel', false);
+    return tween(d, PEG_X[p], restY(p), 170);
+  }
+  function handleTap(p) {
+    if (locked || solving) return;
+    ensureAudio();
+    if (won) { say('Pulsa Reiniciar para jugar otra vez.'); return; }
+    if (sel === null) {
+      if (!pegs[p].length) { say('Esa varilla está vacía.'); return; }
+      select(p);
+    } else if (sel === p) {
+      deselect(); say(intro());
+    } else if (legal(sel, p)) {
+      var a = sel; sel = null; mark(a, 'sel', false);
+      commit(a, p);
+    } else {
+      flashBad(p); shake(top(sel)); thunk();
+      say(ILLEGAL, 'bad');
+    }
+  }
+  function undo() {
+    if (locked || solving || !history.length) return;
+    if (sel !== null) {
+      var p = sel, d = top(p);
+      mark(p, 'sel', false); sel = null;
+      d.tok = {}; setPos(d, PEG_X[p], restY(p));
+    }
+    var m = history.pop();
+    won = false;
+    say('Movimiento deshecho.');
+    commit(m[1], m[0], { rec: false, undo: true });
+  }
+  async function solve() {
+    if (solving) { stopFlag = true; return; }
+    ensureAudio();
+    newGame();
+    var g = gid, seq = [];
+    (function h(k, a, b, c) { if (!k) return; h(k - 1, a, c, b); seq.push([a, b]); h(k - 1, c, b, a); })(n, 2, 0, 1);
+    solving = true; stopFlag = false; setSolveUI(true);
+    say('Solución óptima: ' + seq.length + ' movimientos.');
+    for (var i = 0; i < seq.length; i++) {
+      if (stopFlag || g !== gid) break;
+      await commit(seq[i][0], seq[i][1], { speed: 0.75 });
+      await wait(120);
+    }
+    var done = !stopFlag && g === gid && i === seq.length;
+    solving = false; setSolveUI(false);
+    if (g !== gid) return;
+    locked = false;
+    if (done) say('Solución óptima terminada en ' + moves + ' movimientos.', 'ok');
+    else say('Solución detenida. Puedes seguir jugando desde aquí.');
+  }
+
+  /* ---------- puntero: táctil, lápiz óptico y mouse ---------- */
+  function svgPt(e) {
+    var pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  svg.addEventListener('pointerdown', function (e) {
+    if (drag || locked || solving) return;
+    var h = e.target.closest ? e.target.closest('.hit') : null;
+    if (!h || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    ensureAudio();
+    var p = +h.getAttribute('data-p'), cand = null;
+    if (!won) {
+      if (sel === null) { if (pegs[p].length) cand = top(p); }
+      else if (sel === p) cand = top(p);
+    }
+    drag = { id: e.pointerId, p: p, d: cand, sx: e.clientX, sy: e.clientY, moved: false, ox: 0, oy: 0 };
+    if (cand) { var pt = svgPt(e); drag.ox = cand.x - pt.x; drag.oy = cand.y - pt.y; }
+    try { svg.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  svg.addEventListener('pointermove', function (e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 8) {
+      drag.moved = true;
+      if (drag.d) { drag.d.tok = {}; front(drag.d); svg.classList.add('dragging'); }
+    }
+    if (drag.moved && drag.d) {
+      var pt = svgPt(e);
+      setPos(drag.d, pt.x + drag.ox, pt.y + drag.oy);
+      clearTargets();
+      var t = nearest(drag.d.x);
+      if (t !== drag.p) mark(t, 'target', true);
+    }
+  });
+  function endDrag(e, cancel) {
+    if (!drag || drag.id !== e.pointerId) return;
+    var dr = drag; drag = null;
+    svg.classList.remove('dragging');
+    clearTargets();
+    if (!dr.moved) { if (!cancel) handleTap(dr.p); return; }
+    if (!dr.d) return;
+    var d = dr.d, src = dr.p, tgt = cancel ? src : nearest(d.x);
+    if (sel !== null) { mark(sel, 'sel', false); sel = null; }
+    if (tgt !== src && legal(src, tgt)) {
+      commit(src, tgt, { direct: true });
+    } else {
+      if (tgt !== src) { flashBad(tgt); thunk(); say(ILLEGAL, 'bad'); }
+      else say(intro());
+      tween(d, PEG_X[src], restY(src), 200);
+    }
+  }
+  svg.addEventListener('pointerup', function (e) { endDrag(e, false); });
+  svg.addEventListener('pointercancel', function (e) { endDrag(e, true); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === '1' || e.key === '2' || e.key === '3') { handleTap(+e.key - 1); }
+    else if (e.key === 'Escape') { if (sel !== null && !locked && !solving) { deselect(); say(intro()); } }
+    else if (e.key === 'u' || e.key === 'U') { undo(); }
+  });
+
+  /* ---------- controles ---------- */
+  bUndo.addEventListener('click', function () { ensureAudio(); undo(); });
+  bReset.addEventListener('click', function () { ensureAudio(); newGame(); });
+  bSolve.addEventListener('click', solve);
+  segBtns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      n = +b.getAttribute('data-n');
+      segBtns.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      svg.setAttribute('aria-label', 'Torre de Hanói de madera con tres varillas y ' + n + ' discos de colores');
+      newGame();
+    });
+  });
+  bSound.addEventListener('click', function () {
+    soundOn = !soundOn;
+    bSound.setAttribute('aria-pressed', String(soundOn));
+    bSound.textContent = 'Sonido: ' + (soundOn ? 'sí' : 'no');
+    if (soundOn) { ensureAudio(); tock(); }
+  });
+  if (document.fullscreenEnabled && document.documentElement.requestFullscreen) {
+    bFull.hidden = false;
+    bFull.addEventListener('click', function () {
+      try {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(function () {});
+      } catch (err) {}
+    });
+  }
+
+  newGame();
+})();
+</script>
+</body>
+</html>
 
