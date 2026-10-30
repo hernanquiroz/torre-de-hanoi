@@ -68,25 +68,26 @@
             transform: translateX(-50%);
         }
 
-        /* Orden visual de MENOR a MAYOR (de arriba hacia abajo como en la imagen) */
-        .disk-1 { /* Más pequeño (arriba) - Amarillo */
-            width: 60px;
+        /* Colores y tamaños según la imagen (de abajo hacia arriba):
+           Amarillo grande, Azul, Rojo, Verde, Amarillo pequeño */
+        .disk-5 { /* Más grande (abajo) - Amarillo */
+            width: 220px;
             background-color: #f1c40f;
-        }
-        .disk-2 { /* Verde */
-            width: 100px;
-            background-color: #2ecc71;
-        }
-        .disk-3 { /* Rojo */
-            width: 140px;
-            background-color: #e74c3c;
         }
         .disk-4 { /* Azul */
             width: 180px;
             background-color: #3498db;
         }
-        .disk-5 { /* Más grande (abajo) - Amarillo */
-            width: 220px;
+        .disk-3 { /* Rojo */
+            width: 140px;
+            background-color: #e74c3c;
+        }
+        .disk-2 { /* Verde */
+            width: 100px;
+            background-color: #2ecc71;
+        }
+        .disk-1 { /* Más pequeño (arriba) - Amarillo */
+            width: 60px;
             background-color: #f1c40f;
         }
 
@@ -131,13 +132,13 @@
     <div class="credit">Diseño con Vibe Coding Ing. Hernán Quiroz</div>
 
     <script>
-        // Torre inicial en el poste IZQUIERDO (índice 0)
-        // Orden: de MENOR (arriba) a MAYOR (abajo) como en la imagen
-        // 1=Amarillo pequeño, 2=Verde, 3=Rojo, 4=Azul, 5=Amarillo grande
+        // Estado inicial según la imagen: torre en el poste DERECHO (índice 2)
+        // Orden de abajo hacia arriba: Amarillo(5), Azul(4), Rojo(3), Verde(2), Amarillo(1)
+        // En el array: [5, 4, 3, 2, 1] -> 5 abajo, 1 arriba
         let towers = [
-            [1, 2, 3, 4, 5], // Poste izquierdo: torre completa (1 arriba, 5 abajo)
-            [],              // Poste centro
-            []               // Poste derecho
+            [],              // Poste izquierdo (vacío)
+            [],              // Poste centro (vacío)
+            [5, 4, 3, 2, 1]  // Poste derecho (torre completa como en la imagen)
         ];
 
         let selectedDisk = null;
