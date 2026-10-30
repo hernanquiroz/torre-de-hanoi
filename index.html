@@ -13,6 +13,7 @@
     align-items: center;
     height: 100vh;
     font-family: Arial, sans-serif;
+    user-select: none;
   }
 
   .game {
@@ -34,35 +35,56 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   }
 
-  .peg {
+  /* Área de click amplia para cada poste */
+  .peg-zone {
+    position: absolute;
+    bottom: 48px;
+    width: 120px;
+    height: 220px;
+    cursor: pointer;
+    z-index: 5;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+  .peg-zone:hover {
+    background: rgba(255,255,255,0.08);
+  }
+  .peg-zone.active {
+    background: rgba(255,255,0,0.15);
+  }
+  .peg-zone:nth-child(1) { left: 60px; }
+  .peg-zone:nth-child(2) { left: 290px; }
+  .peg-zone:nth-child(3) { left: 520px; }
+
+  /* Poste visual (solo decorativo) */
+  .peg-visual {
     position: absolute;
     bottom: 48px;
     width: 16px;
     height: 180px;
     background: #3e2723;
     border-radius: 3px;
-    cursor: pointer;
-    transition: background 0.2s;
+    pointer-events: none;
   }
-  .peg:hover { background: #5d4037; }
-  .peg:nth-child(1) { left: 120px; }
-  .peg:nth-child(2) { left: 342px; }
-  .peg:nth-child(3) { left: 564px; }
+  .peg-visual:nth-child(4) { left: 112px; }
+  .peg-visual:nth-child(5) { left: 342px; }
+  .peg-visual:nth-child(6) { left: 572px; }
 
+  /* Los discos: pointer-events: none para que el click pase a la zona */
   .disk {
     position: absolute;
     height: 34px;
     border-radius: 5px;
-    cursor: pointer;
-    transition: left 0.4s ease, bottom 0.4s ease, transform 0.2s;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     border: 1px solid rgba(0,0,0,0.15);
+    pointer-events: none;
+    transition: left 0.4s ease, bottom 0.4s ease, transform 0.2s;
     left: 50%;
     transform: translateX(-50%);
   }
   .disk.lifted {
-    transform: translateX(-50%) translateY(-25px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    transform: translateX(-50%) translateY(-30px);
+    box-shadow: 0 12px 25px rgba(0,0,0,0.5);
   }
 
   /* De MENOR a MAYOR (arriba → abajo) */
@@ -89,6 +111,8 @@
     font-size: 13px;
     color: #333;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 100;
+    white-space: nowrap;
   }
 </style>
 </head>
@@ -97,29 +121,37 @@
 <div class="game" id="game">
   <div class="msg" id="msg">Haz clic en un poste para tomar el disco superior</div>
   <div class="base"></div>
-  <div class="peg" data-peg="0"></div>
-  <div class="peg" data-peg="1"></div>
-  <div class="peg" data-peg="2"></div>
+
+  <!-- Zonas de click (invisibles, amplias) -->
+  <div class="peg-zone" data-peg="0"></div>
+  <div class="peg-zone" data-peg="1"></div>
+  <div class="peg-zone" data-peg="2"></div>
+
+  <!-- Postes visuales (solo decoración) -->
+  <div class="peg-visual"></div>
+  <div class="peg-visual"></div>
+  <div class="peg-visual"></div>
+
   <div id="disks"></div>
 </div>
 
 <div class="info">Diseño Vibe Coding por Ing. Hernán Quiroz</div>
 
 <script>
-  // Estado: cada poste es un array. El ÚLTIMO elemento es el disco de ARRIBA.
-  // Torre inicial en poste derecho (índice 2), de MENOR a MAYOR de arriba hacia abajo.
-  // Array: [5,4,3,2,1] → 5 abajo, 1 arriba (el tope es el último: 1)
+  // Torre inicial en poste derecho (índice 2)
+  // Array: [5,4,3,2,1] → 5 abajo, 1 arriba (tope = último elemento = 1)
   const towers = [
     [],
     [],
     [5, 4, 3, 2, 1]
   ];
 
-  const pegX = [120, 342, 564]; // posición X de cada poste
-  let selected = null; // índice del poste seleccionado (0,1,2) o null
+  const pegX = [120, 342, 572]; // centro X de cada poste
+  let selected = null;
 
   const disksDiv = document.getElementById('disks');
   const msgDiv = document.getElementById('msg');
+  const zones = document.querySelectorAll('.peg-zone');
 
   function render() {
     disksDiv.innerHTML = '';
@@ -128,11 +160,9 @@
       tower.forEach((disk, di) => {
         const el = document.createElement('div');
         el.className = 'disk d' + disk;
-        // bottom: base(48) + di*36 (altura 34 + separación 2)
         el.style.bottom = (48 + di * 36) + 'px';
         el.style.left = pegX[ti] + 'px';
 
-        // Si este disco es el tope del poste seleccionado, levantarlo
         if (selected === ti && di === tower.length - 1) {
           el.classList.add('lifted');
         }
@@ -140,52 +170,49 @@
         disksDiv.appendChild(el);
       });
     });
+
+    // Resaltar zona activa
+    zones.forEach((z, i) => {
+      z.classList.toggle('active', i === selected);
+    });
   }
 
-  function updateMsg(text) {
+  function setMsg(text) {
     msgDiv.textContent = text;
   }
 
-  // Click en postes
-  document.querySelectorAll('.peg').forEach(peg => {
-    peg.addEventListener('click', () => {
-      const ti = parseInt(peg.dataset.peg);
+  zones.forEach(zone => {
+    zone.addEventListener('click', () => {
+      const ti = parseInt(zone.dataset.peg);
 
       if (selected === null) {
-        // Seleccionar: tomar el tope de este poste
         if (towers[ti].length === 0) {
-          updateMsg('⚠️ Ese poste está vacío. Elige otro.');
+          setMsg('⚠️ Ese poste está vacío. Elige otro.');
           return;
         }
         selected = ti;
-        updateMsg('Disco seleccionado. Haz clic en otro poste para soltarlo.');
+        setMsg('Disco seleccionado. Haz clic en otro poste para soltarlo.');
       } else {
-        // Intentar mover desde 'selected' hacia 'ti'
         if (selected === ti) {
-          // Deseleccionar
           selected = null;
-          updateMsg('Selección cancelada. Haz clic en un poste.');
-          render();
-          return;
-        }
-
-        const movingDisk = towers[selected][towers[selected].length - 1];
-        const targetTop = towers[ti].length > 0 ? towers[ti][towers[ti].length - 1] : Infinity;
-
-        if (movingDisk < targetTop) {
-          // Movimiento válido
-          towers[selected].pop();
-          towers[ti].push(movingDisk);
-          selected = null;
-          updateMsg('✅ Movimiento válido. ¡Sigue!');
-
-          // Verificar victoria
-          if (towers[1].length === 5 || towers[0].length === 5) {
-            updateMsg('🎉 ¡GANASTE! Torre completada.');
-          }
+          setMsg('Selección cancelada.');
         } else {
-          updateMsg('❌ No puedes poner un disco grande sobre uno pequeño.');
-          selected = null;
+          const movingDisk = towers[selected][towers[selected].length - 1];
+          const targetTop = towers[ti].length > 0 ? towers[ti][towers[ti].length - 1] : Infinity;
+
+          if (movingDisk < targetTop) {
+            towers[selected].pop();
+            towers[ti].push(movingDisk);
+            selected = null;
+            setMsg('✅ Movimiento válido.');
+
+            if (towers[0].length === 5 || towers[1].length === 5) {
+              setMsg('🎉 ¡GANASTE! Torre completada.');
+            }
+          } else {
+            setMsg('❌ No puedes poner un disco grande sobre uno pequeño.');
+            selected = null;
+          }
         }
       }
       render();
